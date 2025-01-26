@@ -1,25 +1,23 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from app.routes import *
+import os.path
 
-db = SQLAlchemy()
+from flask import Flask
+from app.db import db
+from app.routes import *
 
 
 def create_app():
     app = Flask(__name__)
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///shop.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.secret_key = 'super_secret_key'
+    app.config.from_object("config.Config")
+    app.json.sort_keys = False
 
     db.init_app(app)
 
-    from app.routes.auth import auth_bp
-    from app.routes.cart import cart_bp
-    from app.routes.products import products_bp
+    if not os.path.exists("shop.db"):
+        with app.app_context():
+            db.create_all()
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(cart_bp)
-    app.register_blueprint(products_bp)
+    from app.routes.user import user_bp
+    app.register_blueprint(user_bp)
 
     return app
