@@ -1,8 +1,6 @@
 import os.path
-
-from flask import Flask
+from flask import Flask, session
 from app.db import db
-from app.routes import *
 
 
 def create_app():
@@ -13,11 +11,16 @@ def create_app():
 
     db.init_app(app)
 
+    @app.before_request
+    def init_cart():
+        if 'cart' not in session:
+            session['cart'] = []
+
     if not os.path.exists("shop.db"):
         with app.app_context():
             db.create_all()
 
-    from app.routes.user import user_bp
-    app.register_blueprint(user_bp)
+    from app.routes import api_bp
+    app.register_blueprint(api_bp, url_prefix="/api")
 
     return app

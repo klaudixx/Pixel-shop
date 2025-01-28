@@ -1,27 +1,27 @@
-from run.models.OrderLine import OrderLine
+from flask import Blueprint, jsonify
+from app.db.order import OrderDB
 
+order_bp = Blueprint('orders', __name__, url_prefix='/order')
 
-class Order:
-    MAX_ORDER_VALUE = 30000
+@order_bp.route('/<int:order_id>', methods=['GET'])
+def get_order(order_id):
+    order = OrderDB.query.get(order_id)
+    if not order:
+        return jsonify({'error': 'Order not found'}), 404
 
-    def __init__(self, customer, cart):
-        self.customer = customer
-        self.cart = cart
+    order_data = {
+        'id': order.id,
+        'total_price': order.total_price,
+        'created_at': order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        'order_lines': []
+    }
 
-        self.order_lines = [
-            OrderLine(item, item.price) for item in cart.items
-        ]
+    for line in order.order_lines:
+        order_data['order_lines'].append({
+            'product_id': line.product_id,
+            'product_name': line.product.name,
+            'price': line.price,
+            'quantity': line.quantity
+        })
 
-    def __str__(self):
-        order_summary = "\n".join(str(line) for line in self.order_lines)
-        return f"Order for {self.customer.name}:\n{order_summary}\nTotal: {self.total()} PLN\n"
-
-    def total(self):
-        return sum(line.price_at_order_time for line in self.order_lines)
-
-    def place_order(self):
-        if self.cart.total() > self.MAX_ORDER_VALUE:
-            print("Order cannot be placed. Total value exceeds 30,000 PLN.")
-        else:
-            print(f"Order placed successfully for {self.customer.name}.\n")
-            print(self)
+    return jsonify(order_data), 200
