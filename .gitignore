@@ -1,5 +1,6 @@
 .venv/
 .idea/
-.instance/
-__pycache__/
-/tests
+.pytest_cache/
+instance/
+tests/
+**/__pycache__/
