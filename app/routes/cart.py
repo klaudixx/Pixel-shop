@@ -1,30 +1,29 @@
 from flask import Blueprint, request, jsonify, session
-from app.db import db, ProductDB
+
+from app.models import Cart, Product
 
 
 cart_bp = Blueprint('cart', __name__, url_prefix='/cart')
 
-@cart_bp.route('/', methods=['POST'])
+@cart_bp.route('/add', methods=['POST'])
 def add_to_cart():
     data = request.get_json()
-    product_id = data.get('product_id')
-    quantity = data.get('quantity', 1)
+    product = Product()
 
-    product = db.session.get(ProductDB, product_id)
-    if not product:
-        return jsonify({'error': 'Product not found'}), 404
+    try:
+        product.fetch_from_db(data['product_id'])
+        cart = Cart(session.get('cart'))
+        cart.add_product(product, data['quantity'])
+        session['cart'] = cart.items
+        session.modified = True
+        return jsonify({'message': 'Product added to cart.', 'cart': cart.get()}), 200
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 404
 
-    cart = session['cart']
-    cart.append({
-        'product_id': product.id,
-        'name': product.name,
-        'price': product.price,
-        'quantity': quantity
-    })
+@cart_bp.route('/clear', methods=['POST'])
+def clear_cart():
+    cart = Cart(session.get('cart'))
+    cart.clear()
+    session['cart'] = cart.items
     session.modified = True
-
-    return jsonify({'message': 'Product added to cart', 'cart': cart}), 200
-
-@cart_bp.route('/', methods=['GET'])
-def view_cart():
-    return jsonify(session['cart']), 200
+    return jsonify({'message': 'Cart cleared.', 'cart': cart.items}), 200

@@ -1,30 +1,25 @@
 from flask import Blueprint, request, jsonify
-from app.db import db, UserDB
+
+from app.models import User
 
 
 users_bp = Blueprint('users', __name__, url_prefix='/users')
 
-@users_bp.route('/', methods=['POST'])
+@users_bp.route('/create', methods=['POST'])
 def create_user():
     data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
-    password = data.get('password')
-
-    if UserDB.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email is already in use'}), 400
-
-    user = UserDB(name=name, email=email, password=password)
-    db.session.add(user)
-    db.session.commit()
-
-    return jsonify({'message': 'Customer registered successfully', 'id': user.id}), 201
+    try:
+        user = User(name=data['name'], email=data['email'], password=data['password'])
+        user_id = user.save_to_db()
+        return jsonify({'message': 'User created successfully.','id':user_id}), 201
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-    user = db.session.get(UserDB, user_id)
-
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-
-    return jsonify({'id': user.id, 'name': user.name, 'email': user.email}), 200
+def get_by_id(user_id):
+    user = User()
+    try:
+        user.fetch_from_db(user_id)
+        return jsonify(vars(user)), 200
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 404

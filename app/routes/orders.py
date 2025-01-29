@@ -1,37 +1,29 @@
 from flask import Blueprint, session, jsonify
-from app.db import db, OrderDB, OrderLineDB
 
+from app.models import Cart, Order
 
 orders_bp = Blueprint('orders', __name__, url_prefix='/orders')
 
-@orders_bp.route('/checkout', methods=['POST'])
+@orders_bp.route('/create', methods=['POST'])
 def create_order():
-    cart = session.get('cart', [])
+    cart = Cart(session.get('cart'))
+    order = Order(cart=cart)
 
-    if not cart:
-        return jsonify({'error': 'Cart is empty'}), 400
+    try:
+        order.save_to_db()
+        cart.clear()
+        session['cart'] = cart.items
+        session.modified = True
+        return jsonify({'message': 'Order created successfully.', 'order_id': order.order_id}), 201
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
 
-    total_price = sum(item['price'] * item['quantity'] for item in cart)
+@orders_bp.route('/<int:order_id>', methods=['GET'])
+def get_order_details(order_id):
+    order = Order()
 
-    if total_price > 30000:
-        return jsonify({'error': 'Order exceeds the maximum allowed value (30,000)'}), 400
-
-    order = OrderDB(total_price=total_price)
-    db.session.add(order)
-    db.session.commit()
-
-    for item in cart:
-        order_line = OrderLineDB(
-            order_id=order.id,
-            product_id=item['product_id'],
-            price=item['price'],
-            quantity=item['quantity']
-        )
-        db.session.add(order_line)
-
-    db.session.commit()
-
-    session['cart'] = []
-    session.modified = True
-
-    return jsonify({'message': 'Order created successfully', 'order_id': order.id}), 201
+    try:
+        order.fetch_from_db(order_id)
+        return jsonify(vars(order)), 200
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 404
