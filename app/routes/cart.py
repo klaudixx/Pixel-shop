@@ -8,10 +8,9 @@ cart_bp = Blueprint('cart', __name__, url_prefix='/cart')
 @cart_bp.route('/add', methods=['POST'])
 def add_to_cart():
     data = request.get_json()
-    product = Product()
 
     try:
-        product.fetch_from_db(data['product_id'])
+        product = Product.fetch_from_db(data['product_id'])
         cart = Cart(session.get('cart'))
         cart.add_product(product, data['quantity'])
         session['cart'] = cart.items

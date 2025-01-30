@@ -1,10 +1,11 @@
 from sqlalchemy.orm import joinedload
-
-from app.db import db, OrderDB, OrderLineDB, ProductDB
-
+from app.db import db, OrderDB, OrderLineDB
+from app.models.user import User
 
 class Order:
-    def __init__(self, order_id = None, cart = None, total_price = None, order_lines = None, created_at = None):
+    def __init__(self, user=None, order_id=None, cart=None, total_price=None, order_lines=None, created_at=None):
+        self.user = user
+
         if cart:
             self.cart = cart.get()
             self.total_price = self.cart['total']
@@ -17,11 +18,12 @@ class Order:
     def save_to_db(self):
         if not self.cart['products']:
             raise ValueError("Cart is empty.")
-
         if self.cart['total'] > 30000:
             raise ValueError("Order exceeds the maximum allowed value (30,000).")
+        if not self.user or not self.user.id:
+            raise ValueError("Order must be associated with a user.")
 
-        order = OrderDB(total_price=self.total_price)
+        order = OrderDB(total_price=self.total_price, user_id=self.user.id)
         db.session.add(order)
         db.session.commit()
 
@@ -37,24 +39,22 @@ class Order:
 
         self.order_id = order.id
 
-
-    def fetch_from_db(self, order_id):
-        order = db.session.query(OrderDB).filter_by(id=order_id). \
-            options(joinedload(OrderDB.order_lines).joinedload(OrderLineDB.product)).first()
+    @classmethod
+    def fetch_from_db(cls, order_id):
+        order = db.session.query(OrderDB).filter_by(id=order_id) \
+            .options(joinedload(OrderDB.user), joinedload(OrderDB.order_lines).joinedload(OrderLineDB.product)) \
+            .first()
 
         if not order:
             raise ValueError("Order not found.")
 
-        self.order_id = order.id
-        self.total_price = order.total_price
-        self.created_at = order.created_at
+        user = User.fetch_from_db(user_id=order.user_id)
+        user_dict = {'id': user.id, 'name': user.name, 'email': user.email}
 
-        self.order_lines = []
-        for order_line in order.order_lines:
-            self.order_lines.append({
-                'product_name': order_line.product.name,
-                'price': order_line.price,
-                'quantity': order_line.quantity,
-            })
+        order_lines = [{
+            'product_name': ol.product.name,
+            'price': ol.price,
+            'quantity': ol.quantity,
+        } for ol in order.order_lines]
 
-
+        return cls(user=user_dict, order_id=order.id, total_price=order.total_price, created_at=order.created_at, order_lines=order_lines)

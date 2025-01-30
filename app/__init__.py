@@ -1,5 +1,6 @@
 import os.path
 from flask import Flask, session
+
 from app.db import db
 
 

@@ -15,10 +15,9 @@ def create_product():
 
 @products_bp.route('/<int:product_id>', methods=['GET'])
 def get_by_id(product_id):
-    product = Product()
 
     try:
-        product.fetch_from_db(product_id)
+        product = Product.fetch_from_db(product_id)
         return jsonify(vars(product)), 200
     except ValueError as e:
         return jsonify({'message': str(e)}), 404
@@ -26,9 +25,8 @@ def get_by_id(product_id):
 @products_bp.route('/<int:product_id>/price', methods=['PATCH'])
 def update_price(product_id):
     data = request.get_json()
-    product = Product()
     try:
-        product.fetch_from_db(product_id)
+        product = Product.fetch_from_db(product_id)
         product.update_price(data['price'])
         return jsonify({'message': 'Product price updated successfully.', 'data': vars(product)}), 200
     except ValueError as e:

@@ -1,13 +1,22 @@
 from flask import Blueprint, session, jsonify
 
+from app.db import UserDB
 from app.models import Cart, Order
 
 orders_bp = Blueprint('orders', __name__, url_prefix='/orders')
 
 @orders_bp.route('/create', methods=['POST'])
 def create_order():
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'message': 'User is not logged in.'}), 400
+
+    user = UserDB.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found.'}), 404
+
     cart = Cart(session.get('cart'))
-    order = Order(cart=cart)
+    order = Order(cart=cart, user=user)
 
     try:
         order.save_to_db()
@@ -20,10 +29,8 @@ def create_order():
 
 @orders_bp.route('/<int:order_id>', methods=['GET'])
 def get_order_details(order_id):
-    order = Order()
-
     try:
-        order.fetch_from_db(order_id)
+        order = Order.fetch_from_db(order_id)
         return jsonify(vars(order)), 200
     except ValueError as e:
         return jsonify({'message': str(e)}), 404

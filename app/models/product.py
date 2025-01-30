@@ -7,13 +7,12 @@ class Product:
         self.name = name
         self.price = price
 
-    def fetch_from_db(self, product_id):
+    @classmethod
+    def fetch_from_db(cls, product_id):
         product = db.session.query(ProductDB).filter_by(id=product_id).first()
         if not product:
             raise ValueError("Product not found.")
-        self.id = product.id
-        self.name = product.name
-        self.price = product.price
+        return cls(product_id=product.id, name=product.name, price=product.price)
 
     def save_to_db(self):
         product_db = ProductDB(name=self.name, price=self.price)
