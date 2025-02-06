@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
 
-from app.models import Product
-from app.models.cart import Cart
+from app.models import Product, User
+from app.models.cart import Cart, ValueExceedsLimitError
 from app.repositories.cart_repo import CartRepository
+from app.repositories.order_repo import OrderRepository
 from app.repositories.product_repo import ProductRepository, ProductNotFoundError
 from app.repositories.user_repo import UserRepository, UserNotFoundError
 
@@ -61,12 +62,19 @@ def clear_cart(user_id):
     except UserNotFoundError as e:
         return jsonify({'message': str(e)}), 404
 
-@cart_bp.route('/checkout/<int:cart_id>', methods=['POST'])
-def checkout_cart(cart_id):
-    #Pseudokod
-    #cart_db = cart_repo.find_by_id(cart_id)
-    cart = Cart.from_snapshot(cart_db)
-    order = cart.checkout()
-    order_db = order.snapshot()
-    db.add(order_db)
-    db.commit()
+@cart_bp.route('/<int:user_id>/checkout', methods=['POST'])
+def checkout_cart(user_id):
+    try:
+        user_db = UserRepository.fetch_by_id(user_id)
+        cart_db = CartRepository.fetch_by_user_id(user_id)
+        cart = Cart.from_repository(cart_db)
+
+        user = User.from_repository(user_db)
+        order = cart.checkout(user)
+
+        order_id = OrderRepository.save_in_db(order, user_db.id, cart_db.cart_items)
+        return jsonify({'message': 'Order placed successfully.', 'order_id': order_id}), 201
+    except UserNotFoundError as e:
+        return jsonify({'message': str(e)}), 404
+    except ValueExceedsLimitError as e:
+        return jsonify({'message': str(e)}), 400

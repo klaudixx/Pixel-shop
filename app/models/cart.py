@@ -20,7 +20,7 @@ class Cart:
 
     def checkout(self, user):
         if self.total_price() > 30000:
-            raise ValueError("Order value exceeds 30,000!")
+            raise ValueExceedsLimitError("Order value exceeds 30,000!")
         return Order(user, self)
 
     @classmethod
@@ -35,3 +35,6 @@ class Cart:
             cart.add_product(product, item.quantity)
 
         return cart
+
+class ValueExceedsLimitError(Exception):
+    pass
