@@ -1,33 +1,50 @@
 from flask import Blueprint, request, jsonify
 
-from app.models import Product
+from app.models.product import Product, NoDataProvidedError
+from app.repositories.product_repo import ProductRepository, ProductNotFoundError
 
 products_bp = Blueprint('products', __name__, url_prefix='/products')
 
-@products_bp.route('/add', methods=['POST'])
+@products_bp.route('/', methods=['POST'])
 def create_product():
     data = request.get_json()
+    name = data.get('name')
+    price = data.get('price')
 
-    product = Product(name=data['name'], price=data['price'])
-    product.save_to_db()
+    try:
+        product = Product(name, price)
+        product_id = ProductRepository.save_in_db(product)
 
-    return jsonify({'message': 'Product added successfully.','data': vars(product)}), 201
+        return jsonify({'message': 'Product created successfully.', 'product_id': product_id}), 201
+    except NoDataProvidedError as e:
+        return jsonify({'message': str(e)}), 400
 
 @products_bp.route('/<int:product_id>', methods=['GET'])
 def get_by_id(product_id):
-
     try:
-        product = Product.fetch_from_db(product_id)
+        product_db = ProductRepository.fetch_by_id(product_id)
+        product = Product.from_repository(product_db)
+
         return jsonify(vars(product)), 200
-    except ValueError as e:
+    except ProductNotFoundError as e:
         return jsonify({'message': str(e)}), 404
 
-@products_bp.route('/<int:product_id>/price', methods=['PATCH'])
+@products_bp.route('/', methods=['GET'])
+def get_all():
+    return jsonify({'products': [product.to_dict() for product in ProductRepository.fetch_all()]}), 200
+
+@products_bp.route('/<int:product_id>', methods=['PATCH'])
 def update_price(product_id):
-    data = request.get_json()
+    price = request.get_json().get('price')
+
     try:
-        product = Product.fetch_from_db(product_id)
-        product.update_price(data['price'])
+        product_db = ProductRepository.fetch_by_id(product_id)
+        product = Product.from_repository(product_db)
+        product.update_price(price)
+        ProductRepository.save_in_db(product, product_db)
+
         return jsonify({'message': 'Product price updated successfully.', 'data': vars(product)}), 200
-    except ValueError as e:
+    except ProductNotFoundError as e:
         return jsonify({'message': str(e)}), 404
+    except NoDataProvidedError as e:
+        return jsonify({'message': str(e)}), 400

@@ -1,44 +1,37 @@
-from app import db
-from app.db import ProductDB
+from app.models import Product
+from app.models.order import Order
 
 
 class Cart:
-    def __init__(self, session_cart):
-        self.items = session_cart or []
+    def __init__(self):
+        self.items = {}
 
-    def add_product(self, product, quantity):
-        for item in self.items:
-            if item['product_id'] == product.id:
-                item['quantity'] += quantity
-                return
-        self.items.append({
-            'product_id': product.id,
-            'quantity': quantity
-        })
+    def add_product(self, product, quantity=1):
+        if product in self.items:
+            self.items[product] += quantity
+        else:
+            self.items[product] = quantity
 
     def clear(self):
-        self.items.clear()
+        self.items = {}
 
-    def get(self):
-        total = 0
-        products = []
+    def total_price(self):
+        return sum(product.price * quantity for product, quantity in self.items.items())
 
-        for item in self.items:
-            product = db.session.query(ProductDB).filter_by(id=item['product_id']).first()
+    def checkout(self, user):
+        if self.total_price() > 30000:
+            raise ValueError("Order value exceeds 30,000!")
+        return Order(user, self)
 
-            if product:
-                item_total = product.price * item['quantity']
-                total += item_total
+    @classmethod
+    def from_repository(cls, cart_db):
+        if not cart_db:
+            return cls()
 
-                products.append({
-                    'product_id': product.id,
-                    'name': product.name,
-                    'price': product.price,
-                    'quantity': item['quantity'],
-                    'total': item_total
-                })
+        cart = cls()
 
-        return {
-            'total': total,
-            'products': products
-        }
+        for item in cart_db.cart_items:
+            product = Product.from_repository(item.product)
+            cart.add_product(product, item.quantity)
+
+        return cart
